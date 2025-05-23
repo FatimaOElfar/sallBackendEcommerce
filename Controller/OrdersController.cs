@@ -2,6 +2,7 @@
 using WebApplication1.DTO;
 using WebApplication1.Model;
 using WebApplication1.UFW;
+using Microsoft.EntityFrameworkCore;
 
 namespace WebApplication1.Controllers
 {
@@ -10,17 +11,19 @@ namespace WebApplication1.Controllers
     public class OrdersController : ControllerBase
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly AppDbContext _context; 
 
-        public OrdersController(IUnitOfWork unitOfWork)
+        public OrdersController(IUnitOfWork unitOfWork, AppDbContext context)
         {
             _unitOfWork = unitOfWork;
+            _context = context;
         }
 
         // GET: api/Orders
         [HttpGet]
         public async Task<ActionResult<IEnumerable<OrderDto>>> GetOrders()
         {
-            var orders = await _unitOfWork.Orders.GetAllAsync();
+            var orders = await _context.Orders.Include(o => o.User).ToListAsync();
 
             var ordersDto = orders.Select(order => new OrderDto
             {
@@ -43,7 +46,8 @@ namespace WebApplication1.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<OrderDto>> GetOrder(int id)
         {
-            var order = await _unitOfWork.Orders.GetByIdAsync(id);
+            var order = await _context.Orders.Include(o => o.User)
+                                    .FirstOrDefaultAsync(o => o.Id == id);
 
             if (order == null)
                 return NotFound();
@@ -79,8 +83,8 @@ namespace WebApplication1.Controllers
             await _unitOfWork.Orders.AddAsync(order);
             await _unitOfWork.CompleteAsync();
 
-            // Load User info after saving
-            var savedOrder = await _unitOfWork.Orders.GetByIdAsync(order.Id);
+            var savedOrder = await _context.Orders.Include(o => o.User)
+                                    .FirstOrDefaultAsync(o => o.Id == order.Id);
 
             var orderDto = new OrderDto
             {

@@ -1,9 +1,11 @@
-﻿namespace WebApplication1.UFW
+﻿using WebApplication1.Model;
+
+namespace WebApplication1.UFW
 {
     public interface IUnitOfWork
     {
-        IOrderRepository Orders { get; }
+        IGenericRepository<Product> Products { get; }
+        IGenericRepository<Order> Orders { get; }
         Task<int> CompleteAsync();
-
     }
 }
