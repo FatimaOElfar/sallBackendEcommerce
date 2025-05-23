@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
 using System.Linq.Expressions;
 using WebApplication1.Model;
 
@@ -13,6 +14,20 @@ namespace WebApplication1.UFW
         {
             _context = context;
             _dbSet = _context.Set<T>();
+        }
+        public virtual async Task<T?> GetByIdAsync(int id, string? includeProperties = null)
+        {
+            IQueryable<T> query = _dbSet;
+
+            if (!string.IsNullOrEmpty(includeProperties))
+            {
+                foreach (var includeProperty in includeProperties.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    query = query.Include(includeProperty.Trim());
+                }
+            }
+
+            return await query.FirstOrDefaultAsync(e => EF.Property<int>(e, "Id") == id);
         }
 
         public async Task<IEnumerable<T>> GetAllAsync()
