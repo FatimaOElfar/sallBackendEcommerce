@@ -3,6 +3,7 @@ using WebApplication1.DTO;
 using WebApplication1.Model;
 using WebApplication1.UFW;
 using Microsoft.EntityFrameworkCore;
+using WebApplication1.DTO.product;
 
 namespace WebApplication1.Controllers
 {
@@ -71,20 +72,36 @@ namespace WebApplication1.Controllers
 
         // POST: api/Orders
         [HttpPost]
-        public async Task<ActionResult<OrderDto>> PlaceOrder(OrderCreateDto orderCreateDto)
+
+        public async Task<ActionResult<OrderDto>> PlaceOrder([FromBody] OrderCreateDto orderCreateDto)
         {
             var order = new Order
             {
                 UserId = orderCreateDto.UserId,
                 OrderDate = DateTime.Now,
-                TotalAmount = orderCreateDto.TotalAmount
+                TotalAmount = orderCreateDto.TotalAmount,
+                OrderDetails = new List<OrderDetail>()
             };
 
+            foreach (var detailDto in orderCreateDto.OrderDetails)
+            {
+                var orderDetail = new OrderDetail
+                {
+                    ProductId = detailDto.ProductId,
+                    Quantity = detailDto.Quantity,
+                    UnitPrice = detailDto.UnitPrice
+                };
+                order.OrderDetails.Add(orderDetail);
+            }
+
             await _unitOfWork.Orders.AddAsync(order);
+
             await _unitOfWork.CompleteAsync();
 
-            var savedOrder = await _context.Orders.Include(o => o.User)
-                                    .FirstOrDefaultAsync(o => o.Id == order.Id);
+            var savedOrder = await _unitOfWork.Orders.GetByIdAsync(order.Id);
+
+            if (savedOrder == null)
+                return NotFound();
 
             var orderDto = new OrderDto
             {
@@ -97,7 +114,19 @@ namespace WebApplication1.Controllers
                     Username = savedOrder.User.Username,
                     Email = savedOrder.User.Email,
                     Role = savedOrder.User.Role
-                }
+                },
+                OrderDetails = savedOrder.OrderDetails.Select(od => new OrderDetailDto
+                {
+                    Id = od.Id,
+                    Quantity = od.Quantity,
+                    UnitPrice = od.UnitPrice,
+                    Product = od.Product == null ? null : new ProductDto
+                    {
+                        Id = od.Product.Id,
+                        Name = od.Product.Name,
+                        Price = od.Product.Price
+                    }
+                }).ToList()
             };
 
             return CreatedAtAction(nameof(GetOrder), new { id = order.Id }, orderDto);
@@ -133,5 +162,53 @@ namespace WebApplication1.Controllers
 
             return NoContent();
         }
+        [HttpPost("AddOrderWithDetails")]
+        public async Task<IActionResult> AddOrderWithDetailsAsync([FromBody] OrderCreateDto orderCreateDto)
+        {
+            var order = new Order
+            {
+                UserId = orderCreateDto.UserId,
+                OrderDate = DateTime.Now,
+                TotalAmount = orderCreateDto.TotalAmount,
+                OrderDetails = orderCreateDto.OrderDetails.Select(d => new OrderDetail
+                {
+                    ProductId = d.ProductId,
+                    Quantity = d.Quantity,
+                    UnitPrice = d.UnitPrice
+                }).ToList()
+            };
+
+            await _unitOfWork.Orders.AddAsync(order);
+            await _unitOfWork.CompleteAsync();
+
+            var savedOrder = await _unitOfWork.Orders.GetByIdAsync(order.Id, includeProperties: "OrderDetails.Product");
+
+            var orderDto = new OrderDto
+            {
+                Id = savedOrder.Id,
+                OrderDate = savedOrder.OrderDate,
+                TotalAmount = savedOrder.TotalAmount,
+                User = new UserDto
+                {
+                },
+                OrderDetails = savedOrder.OrderDetails.Select(od => new OrderDetailDto
+                {
+                    Id = od.Id,
+                    Quantity = od.Quantity,
+                    UnitPrice = od.UnitPrice,
+                    Product = new ProductDto
+                    {
+                        Id = od.Product.Id,
+                        Name = od.Product.Name,
+                        Description = od.Product.Description,
+                        Price = od.Product.Price,
+                        ImageUrl = od.Product.ImageUrl
+                    }
+                }).ToList()
+            };
+
+            return Ok(orderDto);
+        }
+
     }
 }

@@ -9,6 +9,9 @@ namespace WebApplication1.UFW
         Task AddAsync(Order order);
         void Update(Order order);
         void Remove(Order order);
+        Task AddOrderDetailsAsync(IEnumerable<OrderDetail> details);
+        Task<IEnumerable<OrderDetail>> GetOrderDetailsByOrderIdAsync(int orderId);
+        void RemoveOrderDetails(IEnumerable<OrderDetail> details);
 
     }
 }
