@@ -5,12 +5,15 @@ namespace WebApplication1.UFW
     public class UnitOfWork : IUnitOfWork
     {
         private readonly AppDbContext _context;
-        public IOrderRepository Orders { get; }
+
+        public IGenericRepository<Product> Products { get; private set; }
+        public IGenericRepository<Order> Orders { get; private set; }
 
         public UnitOfWork(AppDbContext context)
         {
             _context = context;
-            Orders = new OrderRepository(context);
+            Products = new GenericRepository<Product>(_context);
+            Orders = new GenericRepository<Order>(_context);
         }
 
         public async Task<int> CompleteAsync()
@@ -23,5 +26,6 @@ namespace WebApplication1.UFW
             _context.Dispose();
         }
     }
+
 
 }

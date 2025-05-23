@@ -1,94 +1,72 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Mvc;
 using WebApplication1.Model;
+using WebApplication1.UFW;
 
-namespace WebApplication1.Controller
+namespace WebApplication1.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    //[Authorize] 
     public class ProductsController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public ProductsController(AppDbContext context)
+        public ProductsController(IUnitOfWork unitOfWork)
         {
-            _context = context;
+            _unitOfWork = unitOfWork;
         }
 
-        // GET: api/Products
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
         {
-            return await _context.Products.ToListAsync();
+            var products = await _unitOfWork.Products.GetAllAsync();
+            return Ok(products);
         }
 
-        // GET: api/Products/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Product>> GetProduct(int id)
         {
-            var product = await _context.Products.FindAsync(id);
-
+            var product = await _unitOfWork.Products.GetByIdAsync(id);
             if (product == null)
-            {
                 return NotFound();
-            }
-
-            return product;
+            return Ok(product);
         }
 
-        // POST: api/Products
         [HttpPost]
-        //[Authorize(Roles = "Admin")]  
-        public async Task<ActionResult<Product>> PostProduct(Product product)
+        public async Task<IActionResult> CreateProduct(Product product)
         {
-            _context.Products.Add(product);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction("GetProduct", new { id = product.Id }, product);
+            await _unitOfWork.Products.AddAsync(product);
+            await _unitOfWork.CompleteAsync();
+            return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, product);
         }
 
-        // PUT: api/Products/5
         [HttpPut("{id}")]
-        //[Authorize(Roles = "Admin")]
-
-        public async Task<IActionResult> PutProduct(int id, Product product)
+        public async Task<IActionResult> UpdateProduct(int id, Product product)
         {
-            var dbProduct = await _context.Products.FindAsync(id);
-
-            if (dbProduct == null)
-            {
+            var existing = await _unitOfWork.Products.GetByIdAsync(id);
+            if (existing == null)
                 return NotFound();
-            }
 
-            dbProduct.Name = product.Name;
-            dbProduct.Description = product.Description;
-            dbProduct.Price = product.Price;
-            dbProduct.ImageUrl = product.ImageUrl;
+            existing.Name = product.Name;
+            existing.Description = product.Description;
+            existing.Price = product.Price;
+            existing.ImageUrl = product.ImageUrl;
 
-            await _context.SaveChangesAsync();
+            _unitOfWork.Products.Update(existing);
+            await _unitOfWork.CompleteAsync();
 
             return NoContent();
         }
 
-
-        // DELETE: api/Products/5
         [HttpDelete("{id}")]
-        //[Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteProduct(int id)
         {
-            var product = await _context.Products.FindAsync(id);
+            var product = await _unitOfWork.Products.GetByIdAsync(id);
             if (product == null)
-            {
                 return NotFound();
-            }
 
-            _context.Products.Remove(product);
-            await _context.SaveChangesAsync();
-
+            _unitOfWork.Products.Remove(product);
+            await _unitOfWork.CompleteAsync();
             return NoContent();
         }
     }
-
 }
